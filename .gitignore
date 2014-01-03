@@ -1,0 +1,8 @@
+# build files
+build/
+
+# tmp and backup files
+*~
+*.backup
+*.swp
+
