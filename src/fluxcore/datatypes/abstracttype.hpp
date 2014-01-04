@@ -8,7 +8,7 @@ namespace fluxcore {
 class AbstractType {
     public:
         virtual ~AbstractType() = default;
-        virtual typeid_t getID() = 0;
+        virtual typeid_t getID() const = 0;
 };
 
 }

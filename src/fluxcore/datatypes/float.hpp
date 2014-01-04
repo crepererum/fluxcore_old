@@ -6,9 +6,11 @@
 namespace fluxcore {
 
 class Float : public AbstractType {
+    typedef double type;
+
     public:
         ~Float() override = default;
-        typeid_t getID() override;
+        typeid_t getID() const override;
 };
 
 }
