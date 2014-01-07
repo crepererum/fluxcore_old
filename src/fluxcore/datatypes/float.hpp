@@ -9,8 +9,11 @@ class Float : public AbstractType {
     typedef double type;
 
     public:
-        ~Float() override = default;
-        typeid_t getID() const override;
+        virtual ~Float() override = default;
+        virtual typeid_t getID() const override;
+        virtual std::size_t getSize() const override;
+        virtual DataPtr getPtr(void* ptr) const override;
+        virtual std::string getName() const override;
 };
 
 }
