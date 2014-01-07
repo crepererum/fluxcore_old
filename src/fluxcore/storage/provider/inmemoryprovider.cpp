@@ -6,7 +6,7 @@ using namespace fluxcore;
 
 InmemoryProvider::~InmemoryProvider() {
     for (auto& it : segments) {
-        free(it.second.ptr);
+        free(it.second.ptr());
     }
 }
 
@@ -17,7 +17,7 @@ Segment InmemoryProvider::createSegment(std::size_t size) {
         ptr,
         size
     };
-    segments.insert(std::make_pair(segment.id, segment));
+    segments.insert(std::make_pair(segment.id(), segment));
     return segment;
 }
 

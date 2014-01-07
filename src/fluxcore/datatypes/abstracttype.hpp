@@ -1,6 +1,7 @@
 #ifndef FLUXCORE_ABSTRACTTYPE_HPP
 #define FLUXCORE_ABSTRACTTYPE_HPP
 
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -11,27 +12,42 @@ namespace fluxcore {
 class DataPtr;
 class DataRef;
 
+typedef std::shared_ptr<DataPtr> dataptr_t;
+typedef std::shared_ptr<const DataPtr> dataptrconst_t;
+typedef std::shared_ptr<DataRef> dataref_t;
+typedef std::shared_ptr<const DataRef> datarefconst_t;
+
 class AbstractType {
     public:
         virtual ~AbstractType() = default;
+
         virtual typeid_t getID() const = 0;
         virtual std::size_t getSize() const = 0;
-        virtual DataPtr getPtr(void* ptr) const = 0;
         virtual std::string getName() const = 0;
+
+        virtual dataptr_t createPtr(void* ptr) const = 0;
+        virtual dataptrconst_t createPtr(const void* ptr) const = 0;
 };
+
+typedef std::shared_ptr<AbstractType> typeptr_t;
 
 class DataPtr {
     public:
         virtual ~DataPtr() = default;
-        virtual DataRef operator*() = 0;
-        virtual DataPtr&& operator+(std::size_t delta) = 0;
-        virtual std::size_t operator-(const DataPtr& ptr) = 0;
+
+        virtual dataref_t operator*() = 0;
+
+        virtual dataptr_t operator+(std::size_t delta) = 0;
+        virtual dataptrconst_t operator+(std::size_t delta) const = 0;
+
+        virtual std::size_t operator-(const DataPtr& ptr) const = 0;
 };
 
 class DataRef {
     public:
         virtual ~DataRef() = default;
-        virtual DataPtr operator&() = 0;
+
+        virtual dataptr_t operator&() = 0;
         virtual bool operator<(const DataRef& obj) = 0;
         virtual bool operator==(const DataRef& obj) = 0;
 };
@@ -48,15 +64,19 @@ class DataPtrTemplate : public DataPtr {
         DataPtrTemplate(void* ptr_) : ptr(static_cast<T*>(ptr_)) {}
         DataPtrTemplate(T* ptr_) : ptr(ptr_) {}
 
-        virtual DataRef operator*() override {
-            return DataRefTemplate<T>(*ptr);
+        virtual dataref_t operator*() override {
+            return std::make_shared<DataRefTemplate<T>>(*ptr);
         }
 
-        virtual DataPtr&& operator+(std::size_t delta) override {
-            return std::move(DataPtrTemplate<T>(ptr + delta));
+        virtual dataptr_t operator+(std::size_t delta) override {
+            return std::make_shared<DataPtrTemplate<T>>(ptr + delta);
         }
 
-        virtual std::size_t operator-(const DataPtr& obj) override {
+        virtual dataptrconst_t operator+(std::size_t delta) const override {
+            return std::make_shared<DataPtrTemplate<T>>(ptr + delta);
+        }
+
+        virtual std::size_t operator-(const DataPtr& obj) const override {
             auto o = dynamic_cast<const DataPtrTemplate<T>&>(obj);
             return ptr - o.ptr;
         }
@@ -70,8 +90,8 @@ class DataRefTemplate : public DataRef {
     public:
         DataRefTemplate(T& ref_) : ref(ref_) {}
 
-        virtual DataPtr operator&() override {
-            return DataPtrTemplate<T>(&ref);
+        virtual dataptr_t operator&() override {
+            return std::make_shared<DataPtrTemplate<T>>(&ref);
         }
 
         virtual bool operator<(const DataRef& obj) override {

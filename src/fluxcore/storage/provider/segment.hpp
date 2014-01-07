@@ -7,11 +7,29 @@ namespace fluxcore {
 
 class Segment {
     public:
-        const std::size_t id;
-        void* const ptr;
-        const std::size_t size;
+        Segment(std::size_t id, void* ptr, std::size_t size) : myId(id), myPtr(ptr), mySize(size) {}
+        Segment(const Segment&) = default;
+        Segment(Segment&&) = default;
 
-        Segment(std::size_t id_, void* ptr_, std::size_t size_) : id(id_), ptr(ptr_), size(size_) {}
+        Segment& operator=(const Segment&) = default;
+        Segment& operator=(Segment&&) = default;
+
+        std::size_t id() {
+            return myId;
+        }
+
+        void* ptr() {
+            return myPtr;
+        }
+
+        std::size_t size() {
+            return mySize;
+        }
+
+    private:
+        std::size_t myId;
+        void* myPtr;
+        std::size_t mySize;
 };
 
 }

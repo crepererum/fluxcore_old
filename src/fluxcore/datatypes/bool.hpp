@@ -10,10 +10,13 @@ class Bool : public AbstractType {
 
     public:
         virtual ~Bool() override = default;
+
         virtual typeid_t getID() const override;
         virtual std::size_t getSize() const override;
-        virtual DataPtr getPtr(void* ptr) const override;
         virtual std::string getName() const override;
+
+        virtual dataptr_t createPtr(void* ptr) const override;
+        virtual dataptrconst_t createPtr(const void* ptr) const override;
 };
 
 }

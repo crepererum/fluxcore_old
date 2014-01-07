@@ -10,11 +10,16 @@ std::size_t Bool::getSize() const {
     return sizeof(type);
 }
 
-DataPtr Bool::getPtr(void* ptr) const {
-    return DataPtrTemplate<type>(ptr);
-}
-
 std::string Bool::getName() const {
     return "bool";
+}
+
+dataptr_t Bool::createPtr(void* ptr) const {
+    return std::make_shared<DataPtrTemplate<type>>(ptr);
+}
+
+dataptrconst_t Bool::createPtr(const void* ptr) const {
+    // black voodoo!
+    return std::make_shared<DataPtrTemplate<type>>(const_cast<void*>(ptr));
 }
 

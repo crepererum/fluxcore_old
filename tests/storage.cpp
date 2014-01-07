@@ -36,8 +36,8 @@ go_bandit([](){
                 it(ss.str().c_str(), [&](){
                     Segment s = provider.createSegment(bin.second);
 
-                    AssertThat(s.id, IsGreaterThan(static_cast<std::size_t>(0)));
-                    AssertThat(s.size, Equals(bin.second));
+                    AssertThat(s.id(), IsGreaterThan(static_cast<std::size_t>(0)));
+                    AssertThat(s.size(), Equals(bin.second));
 
                     record.insert(std::make_pair(bin.first, std::move(s)));
                 });
@@ -49,11 +49,11 @@ go_bandit([](){
 
                 it(ss.str().c_str(), [&](){
                     Segment good = record.at(bin.first);
-                    Segment s = provider.getSegment(good.id);
+                    Segment s = provider.getSegment(good.id());
 
-                    AssertThat(s.id, Equals(good.id));
-                    AssertThat(s.ptr, Equals(good.ptr));
-                    AssertThat(s.size, Equals(good.size));
+                    AssertThat(s.id(), Equals(good.id()));
+                    AssertThat(s.ptr(), Equals(good.ptr()));
+                    AssertThat(s.size(), Equals(good.size()));
                 });
             }
         }
