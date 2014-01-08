@@ -11,27 +11,62 @@
 
 namespace fluxcore {
 
-template <typename K>
+/* Index that maps keys to <std::size_t>
+ *
+ * @K type of the keys
+ * @nodeSize number of stored keys per node
+ *
+ * The index is implemented as a B+ tree. The <nodeSize> should be chosen according to the application. The bigger the number of stored records, the bigger should <nodeSize> be.
+ */
+template <typename K, std::size_t nodeSize = 2>
 class Index {
-    // Sets the number of stored key-value-pairs per tree node
-    static constexpr std::size_t nodeSize = 2;
-
     public:
+        /* Creates new index
+         *
+         * @provider_ StorageProvider used to store the index data
+         */
         Index(const provider_t& provider_) : provider(provider_) {
             Segment s = provider->createSegment(sizeof(Node)); // waste some space to enable usage of block providers
             rootNode = static_cast<std::size_t*>(s.ptr());
             *rootNode = 0;
         }
 
+        /* Loads an index
+         *
+         * @provider_ StorageProvider used to store the index data
+         * @root id of the root anchor, which is used to load the index
+         *
+         * Warning: Providing an illegal root ID leads to undefinied behavoir!
+         */
         Index(const provider_t& provider_, std::size_t root) : provider(provider_) {
             Segment s = provider->getSegment(root);
             rootNode = static_cast<std::size_t*>(s.ptr());
         }
 
+        /* Dumps index tree to a given <ostream>
+         *
+         * @os ostream that recieves the dump
+         *
+         * Warning: This method requires a valid state, otherwise it can lead to undefinied behavior!
+         *
+         * This method should mostly used for debugging. The ostream should be able to recieve endlines (<std::endl>). The ostream won't be flushed.
+         */
         void dump(std::ostream& os) {
             dumpNode(*rootNode, os);
         }
 
+        /* Checks if the index is empty
+         *
+         * @return <true> if the index is empty
+         */
+        bool empty() const {
+            return *rootNode == 0;
+        }
+
+        /* Returns the first record in the index
+         *
+         * Warning: This method should only be used when the index is NOT empty!
+         */
         std::pair<K, std::size_t> first() const {
             if (*rootNode == 0) {
                 throw std::runtime_error("Index is empty!");
@@ -57,6 +92,10 @@ class Index {
             return std::make_pair(*k, *record);
         }
 
+        /* Returns the last record in the index
+         *
+         * Warning: This method should only be used when the index is NOT empty!
+         */
         std::pair<K, std::size_t> last() const {
             if (*rootNode == 0) {
                 throw std::runtime_error("Index is empty!");
@@ -104,6 +143,7 @@ class Index {
 
             // rise up and look for space
             while (std::get<1>(step)->full()) {
+                // prepate 2 new nodes
                 Segment s1 = provider->createSegment(sizeof(Node));
                 Segment s2 = provider->createSegment(sizeof(Node));
                 memset(s1.ptr(), 0, sizeof(Node));
@@ -112,7 +152,24 @@ class Index {
                 Node* n2 = static_cast<Node*>(s2.ptr());
                 n1->leaf = step.second->leaf;
                 n2->leaf = step.second->leaf;
+                n1->left = step.second->left;
+                n1->right = s2.id();
+                n2->left = s1.id();
+                n2->right = step.second->right;
 
+                // update neigbors
+                if (n1->left != 0) {
+                    Segment tmpS = provider->getSegment(n1->left);
+                    Node* tmpN = static_cast<Node*>(tmpS.ptr());
+                    tmpN->right = s1.id();
+                }
+                if (n2->right != 0) {
+                    Segment tmpS = provider->getSegment(n2->right);
+                    Node* tmpN = static_cast<Node*>(tmpS.ptr());
+                    tmpN->left = s2.id();
+                }
+
+                // split, free, next
                 stepKey = step.second->split(key, n1, n2, child1, child2);
                 provider->freeSegment(step.first.id());
                 step = getParentNode(history, rootNode, provider);
@@ -127,6 +184,8 @@ class Index {
     private:
         struct Node {
             bool leaf;
+            std::size_t left;
+            std::size_t right;
             std::size_t filled;
             K keys[nodeSize];
             std::size_t children[nodeSize + 1];
@@ -165,6 +224,16 @@ class Index {
                 ++filled;
             }
 
+            /* Splits node and adds a new entry
+             *
+             * @key the key of the new entry
+             * @n1 first split result (right node)
+             * @n2 second split result (left node)
+             * @child1 left child of the new entry
+             * @child2 right child of the new entry, ignored for leaf nodes
+             *
+             * @return key of the median which should be pushed to the parent
+             */
             K split(const K& key, Node* n1, Node* n2, std::size_t child1, std::size_t child2) {
                 bool toCheck = true;
                 std::size_t idx = 0;
@@ -331,7 +400,12 @@ class Index {
             }
 
             os  << " filled="
-                << n->filled
+                << n->filled;
+
+            os  << " "
+                << n->left
+                << "<>"
+                << n->right
                 << std::endl;
 
 
