@@ -26,3 +26,13 @@ add_executable (fluxtest EXCLUDE_FROM_ALL ${SourceFilesTest})
 target_link_libraries (fluxtest fluxcore)
 add_custom_target (test COMMAND fluxtest "--reporter=spec" DEPENDS fluxtest)
 
+# generate docs
+string (STRIP "${CMAKE_CXX_FLAGS}" DocsCxxFlags)
+string (REPLACE " " ";" DocsCxxFlags "${DocsCxxFlags}")
+get_directory_property (tmp INCLUDE_DIRECTORIES)
+foreach (item ${tmp})
+    list (APPEND DocsCxxFlags "-I${item}")
+endforeach ()
+file (GLOB_RECURSE HeaderFilesLib "src/fluxcore/*.hpp")
+add_custom_target (docs COMMAND cldoc "generate" ${DocsCxxFlags} "--" "--output=docs" ${HeaderFilesLib})
+
