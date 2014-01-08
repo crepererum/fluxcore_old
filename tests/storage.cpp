@@ -2,6 +2,7 @@
 
 #include <bandit/bandit.h>
 #include <fluxcore/storage/provider/inmemoryprovider.hpp>
+#include <fluxcore/storage/index.hpp>
 
 using namespace bandit;
 using namespace fluxcore;
@@ -56,6 +57,42 @@ go_bandit([](){
                     AssertThat(s.size(), Equals(good.size()));
                 });
             }
+        }
+    });
+
+    describe("Index", [](){
+        typedef std::pair<std::size_t, std::size_t> payload_t;
+        provider_t provider = std::make_shared<InmemoryProvider>();
+        Index<std::size_t> index(provider);
+        std::vector<std::tuple<payload_t, payload_t, payload_t>> testPlan;
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({10, 1}, {10, 1}, {10, 1}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({4, 2}, {4, 2}, {10, 1}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({6, 3}, {4, 2}, {10, 1}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({11, 4}, {4, 2}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({9, 5}, {4, 2}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({1, 6}, {1, 6}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({2, 7}, {1, 6}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({3, 8}, {1, 6}, {11, 4}));
+
+        for (const auto& step : testPlan) {
+            std::stringstream ss;
+            ss  << "Insert pair ("
+                << std::get<0>(step).first
+                << ","
+                << std::get<0>(step).second
+                << ")";
+
+            it(ss.str().c_str(), [&](){
+                index.insert(std::get<0>(step).first, std::get<0>(step).second);
+
+                auto first = index.first();
+                AssertThat(first.first, Equals(std::get<1>(step).first));
+                AssertThat(first.second, Equals(std::get<1>(step).second));
+
+                auto last = index.last();
+                AssertThat(last.first, Equals(std::get<2>(step).first));
+                AssertThat(last.second, Equals(std::get<2>(step).second));
+            });
         }
     });
 });
