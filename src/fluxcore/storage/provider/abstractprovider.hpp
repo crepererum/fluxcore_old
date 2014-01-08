@@ -16,6 +16,7 @@ class AbstractProvider {
 
         virtual Segment getSegment(std::size_t id) = 0;
         virtual Segment createSegment(std::size_t size) = 0;
+        virtual void freeSegment(std::size_t id) = 0;
 };
 
 typedef std::shared_ptr<AbstractProvider> provider_t;

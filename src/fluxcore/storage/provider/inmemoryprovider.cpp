@@ -25,3 +25,9 @@ Segment InmemoryProvider::getSegment(std::size_t id) {
    return segments.at(id);
 }
 
+void InmemoryProvider::freeSegment(std::size_t id) {
+    Segment s = segments.at(id);
+    free(s.ptr());
+    segments.erase(id);
+}
+

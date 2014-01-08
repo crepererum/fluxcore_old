@@ -11,8 +11,10 @@ class InmemoryProvider : public AbstractProvider {
     public:
         InmemoryProvider() = default;
         ~InmemoryProvider();
+
         Segment createSegment(std::size_t size) override;
         Segment getSegment(std::size_t id) override;
+        void freeSegment(std::size_t id) override;
 
     private:
         std::map<std::size_t, Segment> segments;
