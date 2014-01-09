@@ -35,15 +35,21 @@ class Index {
         /* Loads an index
          *
          * @provider_ StorageProvider used to store the index data
-         * @root id of the root anchor, which is used to load the index
+         * @id_ id of the root anchor, which is used to load the index
          *
          * Warning: Providing an illegal root ID leads to undefinied behavoir!
          */
-        Index(const provider_t& provider_, std::size_t root) : provider(provider_), id(root) {
-            Segment s = provider->getSegment(root);
+        Index(const provider_t& provider_, std::size_t id_) : provider(provider_), id(id_) {
+            Segment s = provider->getSegment(id);
             rootNode = static_cast<std::size_t*>(s.ptr());
         }
 
+        /* Returns id of the root anchor
+         *
+         * @return id of the root anchor
+         *
+         * This id can be used to restore the index later by using the load constructor.
+         */
         std::size_t getID() const {
             return id;
         }
@@ -126,6 +132,13 @@ class Index {
             return std::make_pair(*k, *record);
         }
 
+        /* Inserts new key and record to index
+         *
+         * @key new, unique key that sould inserted
+         * @record record that gets assoziated to the key
+         *
+         * Warning: The key has to be new and unique, otherwise it leads to undefinied behavior!
+         */
         void insert(const K& key, const std::size_t record) {
             // Step 1: walk down and find insert point
             std::list<std::size_t> history = walkDown(key);
@@ -176,6 +189,12 @@ class Index {
             step.second->add(stepKey, child1, child2);
         }
 
+        /* Erases exisiting key and assoziated record from index
+         *
+         * @key the key that should be removed
+         *
+         * Warning: The key has to exist, otherwise it leads to undefinied behavior!
+         */
         void erase(const K& key) {
             // Step 1: find leaf
             std::list<std::size_t> history = walkDown(key);
@@ -230,6 +249,13 @@ class Index {
                     } else {
                         // merge
                         n->mergeWith(step.second, *separator);
+                        n->right = step.second->right;
+                        if (step.second->right != 0) {
+                            Segment tmpS = provider->getSegment(step.second->right);
+                            Node* tmpN = static_cast<Node*>(tmpS.ptr());
+                            tmpN->left = s.id();
+                        }
+                        provider->freeSegment(step.first.id());
                         parentStep.second->removeByKeyRight(*separator);
                     }
                 } else {
@@ -274,6 +300,13 @@ class Index {
                     } else {
                         // merge
                         step.second->mergeWith(n, *separator);
+                        step.second->right = n->right;
+                        if (n->right != 0) {
+                            Segment tmpS = provider->getSegment(n->right);
+                            Node* tmpN = static_cast<Node*>(tmpS.ptr());
+                            tmpN->left = step.first.id();
+                        }
+                        provider->freeSegment(s.id());
                         parentStep.second->removeByKeyRight(*separator);
                     }
                 }
@@ -281,7 +314,11 @@ class Index {
                 step = parentStep;
             }
 
-            // TODO handle rootNode cases
+            // cleanup root
+            if (step.second->filled < nodeSize / 2) {
+                *rootNode = step.second->children[0];
+                provider->freeSegment(step.first.id());
+            }
         }
 
     private:
@@ -386,10 +423,20 @@ class Index {
                 --filled;
             }
 
-            // TODO implement 4 cases =/
+            /* Merges this node with a node on the left side
+             *
+             * @other node on the left side
+             * @separator for internal nodes a separator key gets merged in, ignored for leaf nodes
+             */
             void mergeWith(Node* other, const K& separator) {
                 std::size_t idxChildren = filled;
                 std::size_t idxKeys = filled;
+
+                if (!leaf) {
+                    keys[idxKeys] = separator;
+                    ++idxChildren;
+                    ++idxKeys;
+                }
 
                 for (std::size_t i = 0; i < other->filled; ++i) {
                     keys[idxKeys] = other->keys[i];
@@ -397,9 +444,12 @@ class Index {
                     ++idxKeys;
                     ++idxChildren;
                 }
-                children[idxChildren] = other->children[other->filled];
 
-                filled += other->filled;
+                if (!leaf) {
+                    children[idxChildren] = other->children[other->filled];
+                }
+
+                filled = idxKeys;
             }
 
             /* Splits node and adds a new entry
