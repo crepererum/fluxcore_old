@@ -25,10 +25,11 @@ class Index {
          *
          * @provider_ StorageProvider used to store the index data
          */
-        Index(const provider_t& provider_) : provider(provider_) {
+        explicit Index(const provider_t& provider_) : provider(provider_) {
             Segment s = provider->createSegment(sizeof(Node)); // waste some space to enable usage of block providers
             rootNode = static_cast<std::size_t*>(s.ptr());
             *rootNode = 0;
+            id = s.id();
         }
 
         /* Loads an index
@@ -38,9 +39,13 @@ class Index {
          *
          * Warning: Providing an illegal root ID leads to undefinied behavoir!
          */
-        Index(const provider_t& provider_, std::size_t root) : provider(provider_) {
+        Index(const provider_t& provider_, std::size_t root) : provider(provider_), id(root) {
             Segment s = provider->getSegment(root);
             rootNode = static_cast<std::size_t*>(s.ptr());
+        }
+
+        std::size_t getID() const {
+            return id;
         }
 
         /* Dumps index tree to a given <ostream>
@@ -123,20 +128,10 @@ class Index {
 
         void insert(const K& key, const std::size_t record) {
             // Step 1: walk down and find insert point
-            std::size_t current = *rootNode;
-            std::list<std::size_t> history;
-            bool foundLeaf = false;
-
-            while (!foundLeaf && (current != 0)) {
-                Segment s = provider->getSegment(current);
-                Node* n = static_cast<Node*>(s.ptr());
-                history.push_front(current);
-                current = std::get<0>(n->findUpperAnchor(key));
-                foundLeaf = n->leaf;
-            }
+            std::list<std::size_t> history = walkDown(key);
 
             // Step 2: push data up to the root
-            auto step = getParentNode(history, rootNode, provider);
+            auto step = getParentNode(history);
             K stepKey = key;
             std::size_t child1 = record;
             std::size_t child2 = 0;
@@ -170,9 +165,9 @@ class Index {
                 }
 
                 // split, free, next
-                stepKey = step.second->split(key, n1, n2, child1, child2);
+                stepKey = step.second->split(stepKey, n1, n2, child1, child2);
                 provider->freeSegment(step.first.id());
-                step = getParentNode(history, rootNode, provider);
+                step = getParentNode(history);
                 child1 = s1.id();
                 child2 = s2.id();
             }
@@ -181,7 +176,119 @@ class Index {
             step.second->add(stepKey, child1, child2);
         }
 
+        void erase(const K& key) {
+            // Step 1: find leaf
+            std::list<std::size_t> history = walkDown(key);
+
+            // Step 2: delete until tree is happy
+            auto step = getParentNode(history);
+            step.second->removeByKeyLeft(key);
+
+            while (!history.empty() && (step.second->filled < nodeSize / 2)) {
+                auto parentStep = getParentNode(history);
+                K* separator = nullptr;
+
+                // find sibling to re-distribute
+                if ((step.second->left != 0) && (separator = parentStep.second->getSeparator(step.second->left, step.first.id()))) {
+                    Segment s = provider->getSegment(step.second->left);
+                    Node* n = static_cast<Node*>(s.ptr());
+
+                    if (step.second->filled + n->filled >= nodeSize) {
+                        if (step.second->leaf) {
+                            // => shift to right
+                            // get relevant information
+                            K k = n->keys[n->filled - 1];
+                            std::size_t c1 = n->children[n->filled - 1];
+
+                            // remove element from left node
+                            memset(&n->keys[n->filled - 1], 0, sizeof(K));
+                            n->children[n->filled - 1] = 0;
+                            --n->filled;
+
+                            // add element to right node
+                            step.second->add(k, c1, step.second->children[0]);
+
+                            // fix separator
+                            *separator = k;
+                        } else {
+                            // => rotate clockwise
+                            // get relevant information
+                            K k = n->keys[n->filled - 1];
+                            std::size_t c1 = n->children[n->filled];
+
+                            // remove element from left node
+                            memset(&n->keys[n->filled - 1], 0, sizeof(K));
+                            n->children[n->filled] = 0;
+                            --n->filled;
+
+                            // add element to right node
+                            step.second->add(*separator, c1, step.second->children[0]);
+
+                            // fix separator
+                            *separator = k;
+                        }
+                    } else {
+                        // merge
+                        n->mergeWith(step.second, *separator);
+                        parentStep.second->removeByKeyRight(*separator);
+                    }
+                } else {
+                    separator = parentStep.second->getSeparator(step.first.id(), step.second->right);
+                    Segment s = provider->getSegment(step.second->right);
+                    Node* n = static_cast<Node*>(s.ptr());
+
+                    if (step.second->filled + n->filled >= nodeSize) {
+                        if (step.second->leaf) {
+                            // => shift to left
+                            // get relevant information
+                            K k = n->keys[0];
+                            std::size_t c1 = n->children[0];
+
+                            // remove element from left node
+                            n->removeByKeyLeft(k);
+
+                            // add element to right node
+                            step.second->keys[step.second->filled] = k;
+                            step.second->children[step.second->filled] = c1;
+                            ++step.second->filled;
+
+                            // fix separator
+                            *separator = n->keys[0];
+                        } else {
+                            // => rotate anti-clockwise
+                            // get relevant information
+                            K k = n->keys[0];
+                            std::size_t c1 = n->children[0];
+
+                            // remove element from left node
+                            n->removeByKeyLeft(k);
+
+                            // add element to right node
+                            step.second->keys[step.second->filled] = *separator;
+                            step.second->children[step.second->filled + 1] = c1;
+                            ++step.second->filled;
+
+                            // fix separator
+                            *separator = k;
+                        }
+                    } else {
+                        // merge
+                        step.second->mergeWith(n, *separator);
+                        parentStep.second->removeByKeyRight(*separator);
+                    }
+                }
+
+                step = parentStep;
+            }
+
+            // TODO handle rootNode cases
+        }
+
     private:
+        /* Tree node, can be internal or leaf
+         *
+         * Parent nodes are not stored because the can be extracted from the walk down history
+         */
         struct Node {
             bool leaf;
             std::size_t left;
@@ -196,6 +303,20 @@ class Index {
              */
             bool full() {
                 return filled == nodeSize;
+            }
+
+            /* Gets separtor key of to children
+             *
+             * This method works only on direct siblings.
+             */
+            K* getSeparator(std::size_t child1, std::size_t child2) {
+                for (std::size_t i = 0; i < filled; ++i) {
+                    if ((children[i] == child1) && (children[i + 1] == child2)) {
+                        return &keys[i];
+                    }
+                }
+
+                return nullptr;
             }
 
             /* Adds entry to non-full node
@@ -224,6 +345,63 @@ class Index {
                 ++filled;
             }
 
+            /* Remove key and the left child
+             */
+            void removeByKeyLeft(const K& key) {
+                std::size_t idx = 0;
+
+                for (std::size_t i = 0; i < filled; ++i) {
+                    if (keys[i] == key) {
+                        memset(&keys[i], 0, sizeof(K));
+                        children[i] = 0;
+                    } else {
+                        keys[idx] = keys[i];
+                        children[idx] = children[i];
+                        ++idx;
+                    }
+                }
+
+                memset(&keys[filled - 1], 0, sizeof(K));
+                children[idx] = children[filled];
+                --filled;
+            }
+
+            /* Remove key and the right child
+             */
+            void removeByKeyRight(const K& key) {
+                std::size_t idx = 0;
+
+                for (std::size_t i = 0; i < filled; ++i) {
+                    if (keys[i] == key) {
+                        memset(&keys[i], 0, sizeof(K));
+                        children[i + 1] = 0;
+                    } else {
+                        keys[idx] = keys[i];
+                        children[idx + 1] = children[i + 1];
+                        ++idx;
+                    }
+                }
+
+                memset(&keys[filled - 1], 0, sizeof(K));
+                --filled;
+            }
+
+            // TODO implement 4 cases =/
+            void mergeWith(Node* other, const K& separator) {
+                std::size_t idxChildren = filled;
+                std::size_t idxKeys = filled;
+
+                for (std::size_t i = 0; i < other->filled; ++i) {
+                    keys[idxKeys] = other->keys[i];
+                    children[idxChildren] = other->children[i];
+                    ++idxKeys;
+                    ++idxChildren;
+                }
+                children[idxChildren] = other->children[other->filled];
+
+                filled += other->filled;
+            }
+
             /* Splits node and adds a new entry
              *
              * @key the key of the new entry
@@ -233,6 +411,10 @@ class Index {
              * @child2 right child of the new entry, ignored for leaf nodes
              *
              * @return key of the median which should be pushed to the parent
+             *
+             * There are 2 variants implemented:
+             * a) leaf nodes: the median is kept in one of the splitted nodes
+             * b) internal nodes: the median is pushed out and should be added to the parent
              */
             K split(const K& key, Node* n1, Node* n2, std::size_t child1, std::size_t child2) {
                 bool toCheck = true;
@@ -241,7 +423,7 @@ class Index {
                 std::size_t childrenTargetIdx = 0;
 
                 // first node
-                for (std::size_t i = 0; i < nodeSize / 2; ++i) {
+                for (std::size_t i = 0; i < nodeSize / 2 + (leaf ? 1 : 0); ++i) {
                     if (toCheck && (keys[idx] > key)) {
                         // add key and value
                         n1->keys[i] = key;
@@ -270,39 +452,41 @@ class Index {
                     }
                 }
 
-                // median
                 K median;
-                if (toCheck && (keys[idx] > key)) {
-                    // extract key and value
+                if (toCheck && ((idx == nodeSize) || (keys[idx] > key))) {
                     median = key;
-                    toCheck = false;
 
-                    // append children
-                    n1->keys[nodeSize / 2] = key;
-                    n1->children[childrenTargetIdx] = child1;
-                    childrenTargetIdx = 0;
-
+                    // consume it
                     if (!leaf) {
-                        n2->children[childrenTargetIdx] = child2;
-                        ++childrenTargetIdx;
+                        toCheck = false;
+
+                        // append children
+                        n1->children[childrenTargetIdx] = child1;
+                        n2->children[0] = child2;
+                        childrenTargetIdx = 1;
                         ++childrenSourceIdx;
+                    } else {
+                        childrenTargetIdx = 0;
                     }
                 } else {
-                    // extract key and value
                     median = keys[idx];
-                    n1->keys[nodeSize / 2] = keys[idx];
-                    ++idx;
 
-                    // add last or first child?
-                    // (this passes over the left/right delta)
-                    if (toCheck || leaf) {
-                        n1->children[childrenTargetIdx] = children[childrenSourceIdx];
-                        ++childrenSourceIdx;
-                        childrenTargetIdx = 0;
+                    // consume it
+                    if (!leaf) {
+                        ++idx;
+                        // add last or first child?
+                        // (this passes over the left/right delta)
+                        if (toCheck) {
+                            n1->children[childrenTargetIdx] = children[childrenSourceIdx];
+                            ++childrenSourceIdx;
+                            childrenTargetIdx = 0;
+                        } else {
+                            n2->children[0] = children[childrenSourceIdx];
+                            ++childrenSourceIdx;
+                            childrenTargetIdx = 1;
+                        }
                     } else {
-                        n2->children[0] = children[childrenSourceIdx];
-                        ++childrenSourceIdx;
-                        childrenTargetIdx = 1;
+                        childrenTargetIdx = 0;
                     }
                 }
 
@@ -338,7 +522,7 @@ class Index {
                 }
 
                 // set node attributes
-                n1->filled = nodeSize / 2 + 1;
+                n1->filled = nodeSize / 2 + (leaf ? 1 : 0);
                 n2->filled = nodeSize / 2;
 
                 return median;
@@ -377,6 +561,7 @@ class Index {
 
         provider_t provider;
         std::size_t* rootNode;
+        std::size_t id;
 
         /* Dumps a node including children to a given ostream
          *
@@ -429,7 +614,7 @@ class Index {
 
 
             if (!n->leaf) {
-                for (std::size_t i = 0; i < nodeSize + 1; ++i) {
+                for (std::size_t i = 0; i < std::min(nodeSize, n->filled) + 1; ++i) {
                     if (n->children[i] != 0) {
                         dumpNode(n->children[i], os);
                     }
@@ -437,7 +622,23 @@ class Index {
             }
         }
 
-        static std::pair<Segment, Node*> getParentNode(std::list<std::size_t>& history, std::size_t*& rootNode, provider_t& provider) {
+        std::list<std::size_t> walkDown(const K& key) {
+            std::size_t current = *rootNode;
+            std::list<std::size_t> history;
+            bool foundLeaf = false;
+
+            while (!foundLeaf && (current != 0)) {
+                Segment s = provider->getSegment(current);
+                Node* n = static_cast<Node*>(s.ptr());
+                history.push_front(current);
+                current = std::get<0>(n->findUpperAnchor(key));
+                foundLeaf = n->leaf;
+            }
+
+            return history;
+        }
+
+        std::pair<Segment, Node*> getParentNode(std::list<std::size_t>& history) {
             if (history.empty()) {
                 // new root node
                 Segment s = provider->createSegment(sizeof(Node));

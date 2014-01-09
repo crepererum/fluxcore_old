@@ -73,26 +73,47 @@ go_bandit([](){
         testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({1, 6}, {1, 6}, {11, 4}));
         testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({2, 7}, {1, 6}, {11, 4}));
         testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({3, 8}, {1, 6}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({3, 0}, {1, 6}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({3, 8}, {1, 6}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({1, 0}, {2, 7}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({7, 19}, {2, 7}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({8, 18}, {2, 7}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({2, 0}, {3, 8}, {11, 4}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({12, 14}, {3, 8}, {12, 14}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({8, 0}, {3, 8}, {12, 14}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({1, 1}, {1, 1}, {12, 14}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({2, 2}, {1, 1}, {12, 14}));
+        testPlan.push_back(std::make_tuple<payload_t, payload_t, payload_t>({7, 0}, {1, 1}, {12, 14}));
 
         for (const auto& step : testPlan) {
-            std::stringstream ss;
-            ss  << "Insert pair ("
-                << std::get<0>(step).first
-                << ","
-                << std::get<0>(step).second
-                << ")";
+            if (std::get<0>(step).second != 0) {
+                std::stringstream ss;
+                ss  << "Insert pair ("
+                    << std::get<0>(step).first
+                    << ","
+                    << std::get<0>(step).second
+                    << ")";
 
-            it(ss.str().c_str(), [&](){
-                index.insert(std::get<0>(step).first, std::get<0>(step).second);
+                it(ss.str().c_str(), [&](){
+                    index.insert(std::get<0>(step).first, std::get<0>(step).second);
 
-                auto first = index.first();
-                AssertThat(first.first, Equals(std::get<1>(step).first));
-                AssertThat(first.second, Equals(std::get<1>(step).second));
+                    auto first = index.first();
+                    AssertThat(first.first, Equals(std::get<1>(step).first));
+                    AssertThat(first.second, Equals(std::get<1>(step).second));
 
-                auto last = index.last();
-                AssertThat(last.first, Equals(std::get<2>(step).first));
-                AssertThat(last.second, Equals(std::get<2>(step).second));
-            });
+                    auto last = index.last();
+                    AssertThat(last.first, Equals(std::get<2>(step).first));
+                    AssertThat(last.second, Equals(std::get<2>(step).second));
+                });
+            } else {
+                std::stringstream ss;
+                ss  << "Remove record "
+                    << std::get<0>(step).first;
+
+                it(ss.str().c_str(), [&](){
+                    index.erase(std::get<0>(step).first);
+                });
+            }
         }
     });
 });
