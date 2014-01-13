@@ -4,5 +4,5 @@ build/
 # tmp and backup files
 *~
 *.backup
-*.swp
+*.s[a-z][a-z]
 
