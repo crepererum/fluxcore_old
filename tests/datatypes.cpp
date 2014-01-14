@@ -6,6 +6,11 @@
 
 #include <fluxcore/datatypes/bool.hpp>
 #include <fluxcore/datatypes/float.hpp>
+#include <fluxcore/datatypes/int.hpp>
+#include <fluxcore/datatypes/byte.hpp>
+#include <fluxcore/datatypes/char.hpp>
+#include <fluxcore/datatypes/array.hpp>
+#include <fluxcore/datatypes/tuple.hpp>
 
 using namespace bandit;
 using namespace fluxcore;
@@ -22,10 +27,21 @@ go_bandit([](){
     describe("datatypes:", [](){
         std::list<std::pair<typeptr_t, std::string>> all;
         std::set<std::size_t> ids;
-        
+
         it("is possible to initialize all", [&](){
             addType<Float>("float", all);
             addType<Bool>("bool", all);
+            addType<Int>("int", all);
+            addType<Byte>("byte", all);
+            addType<Char>("char", all);
+
+            all.push_back(std::make_pair<typeptr_t, std::string>(std::make_shared<Array>(all.begin()->first, 10), "array<bool,10>"));
+
+            std::list<typeptr_t> tupleList;
+            tupleList.push_back(std::make_shared<Float>());
+            tupleList.push_back(std::make_shared<Bool>());
+            tupleList.push_back(std::make_shared<Char>());
+            all.push_back(std::make_pair<typeptr_t, std::string>(std::make_shared<Tuple>(tupleList), "tuple<float,bool,char>"));
         });
 
         for (auto& p : all) {

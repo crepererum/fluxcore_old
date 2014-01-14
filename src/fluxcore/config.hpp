@@ -5,7 +5,8 @@
 
 namespace fluxcore {
 
-typedef uint8_t typeid_t;
+typedef uint8_t byte_t;
+typedef byte_t typeid_t;
 
 }
 
