@@ -1,12 +1,13 @@
 #include "array.hpp"
 
+#include <bitset>
 #include <sstream>
 
 using namespace fluxcore;
 
 class ArrayPtr : public DataPtr {
     public:
-        ArrayPtr(void* ptr_, typeptr_t basetype_, std::size_t size_) :
+        ArrayPtr(void* ptr_, typeptr_t basetype_, arraySize_t size_) :
             ptr(static_cast<byte_t*>(ptr_)),
             basetype(basetype_),
             size(size_) {}
@@ -29,12 +30,12 @@ class ArrayPtr : public DataPtr {
     private:
         byte_t* ptr;
         typeptr_t basetype;
-        std::size_t size;
+        arraySize_t size;
 };
 
 class ArrayRef : public DataRef {
     public:
-        ArrayRef(void* ptr_, typeptr_t basetype_, std::size_t size_) :
+        ArrayRef(void* ptr_, typeptr_t basetype_, arraySize_t size_) :
             ptr(static_cast<byte_t*>(ptr_)),
             basetype(basetype_),
             size(size_) {}
@@ -92,19 +93,19 @@ class ArrayRef : public DataRef {
     private:
         byte_t* ptr;
         typeptr_t basetype;
-        std::size_t size;
+        arraySize_t size;
 };
 
 dataref_t ArrayPtr::operator*() {
     return std::shared_ptr<DataRef>(new ArrayRef(ptr, basetype, size));
 }
 
-Array::Array(typeptr_t& basetype_, std::size_t size_) :
+Array::Array(typeptr_t& basetype_, arraySize_t size_) :
         basetype(basetype_),
         size(size_) {}
 
 typeid_t Array::getID() const {
-    return 3;
+    return id;
 }
 
 std::size_t Array::getSize() const {
@@ -129,5 +130,51 @@ dataptr_t Array::createPtr(void* ptr) const {
 dataptrconst_t Array::createPtr(const void* ptr) const {
     // black voodoo!
     return std::make_shared<ArrayPtr>(const_cast<void*>(ptr), basetype, size);
+}
+
+void Array::generateDescriptor(typedescr_t::iterator& begin, typedescr_t::iterator end) const {
+    if (begin == end) {
+        throw std::runtime_error("Typedescriptor is going to be too long!");
+    }
+    *begin = id;
+    ++begin;
+
+    basetype->generateDescriptor(begin, end);
+
+    std::bitset<sizeof(typeid_t) * 8> mask1;
+    mask1.flip();
+    auto mask2 = mask1.to_ulong();
+    for (std::size_t i = sizeof(arraySize_t) / sizeof(typeid_t); i > 0; --i) {
+        if (begin == end) {
+            throw std::runtime_error("Typedescriptor is going to be too long!");
+        }
+
+        *begin = (size >> (sizeof(typeid_t) * 8 * (i - 1))) & mask2;
+        ++begin;
+    }
+}
+
+typeptr_t Array::parseDescriptor(typedescr_t::const_iterator& begin, typedescr_t::const_iterator end) {
+    if (begin == end) {
+        throw std::runtime_error("Illegal type descriptor!");
+    }
+    if (*begin != id) {
+        throw std::runtime_error("This typedescriptor does not belong to this type!");
+    }
+    ++begin;
+
+    auto basetype = Typeregistry::getRegistry().parseType(begin, end);
+
+    arraySize_t size = 0;
+    for (std::size_t i = 0; i < sizeof(arraySize_t) / sizeof(typeid_t); ++i) {
+        if (begin == end) {
+            throw std::runtime_error("Illegal typedescriptor!");
+        }
+
+        size = (size << (sizeof(typeid_t) * 8)) | *begin;
+        ++begin;
+    }
+
+    return std::make_shared<Array>(basetype, size);
 }
 

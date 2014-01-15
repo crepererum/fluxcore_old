@@ -3,12 +3,16 @@
 
 #include <list>
 
+#include "../config.hpp"
 #include "abstracttype.hpp"
+#include "typeregistry.hpp"
 
 namespace fluxcore {
 
 class Tuple : public AbstractType {
     public:
+        static constexpr typeid_t id = 7;
+
         Tuple(const std::list<typeptr_t>& basetypes_);
         virtual ~Tuple() override = default;
 
@@ -19,9 +23,12 @@ class Tuple : public AbstractType {
         virtual dataptr_t createPtr(void* ptr) const override;
         virtual dataptrconst_t createPtr(const void* ptr) const override;
 
+        virtual void generateDescriptor(typedescr_t::iterator& begin, typedescr_t::iterator end) const;
+        static typeptr_t parseDescriptor(typedescr_t::const_iterator& begin, typedescr_t::const_iterator end);
+
     private:
         std::list<typeptr_t> basetypes;
-        std::size_t size;
+        tupleSize_t size;
 };
 
 }

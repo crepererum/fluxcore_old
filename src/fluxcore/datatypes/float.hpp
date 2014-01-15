@@ -1,23 +1,18 @@
 #ifndef FLUXCORE_FLOAT_HPP
 #define FLUXCORE_FLOAT_HPP
 
-#include "abstracttype.hpp"
+#include "primitivetype.hpp"
 
 namespace fluxcore {
 
-class Float : public AbstractType {
-    typedef double type;
-
-    public:
-        virtual ~Float() override = default;
-
-        virtual typeid_t getID() const override;
-        virtual std::size_t getSize() const override;
-        virtual std::string getName() const override;
-
-        virtual dataptr_t createPtr(void* ptr) const override;
-        virtual dataptrconst_t createPtr(const void* ptr) const override;
+struct FloatHelper {
+    typedef double type; // TODO select stable float type
+    static constexpr typeid_t id = 1;
+    static std::string getName() {
+        return "float";
+    }
 };
+typedef PrimitiveType<FloatHelper> Float;
 
 }
 

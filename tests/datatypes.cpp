@@ -53,6 +53,16 @@ go_bandit([](){
                     AssertThat(id, IsGreaterThan(0));
                     ids.insert(id);
                 });
+
+                it("can generate and parse a typedescriptor", [&](){
+                    typedescr_t descriptor;
+                    t->generateDescriptor(descriptor.begin(), descriptor.end());
+
+                    typeptr_t t2 = Typeregistry::getRegistry().parseType(descriptor.cbegin(), descriptor.cend());
+                    AssertThat(t2->getID(), Equals(t->getID()));
+                    AssertThat(t2->getSize(), Equals(t->getSize()));
+                    AssertThat(t2->getName(), Equals(t->getName()));
+                });
             });
         }
 

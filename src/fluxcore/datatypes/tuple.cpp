@@ -1,6 +1,8 @@
 #include "tuple.hpp"
 
 #include <algorithm>
+#include <bitset>
+#include <limits>
 #include <sstream>
 
 #include "../config.hpp"
@@ -118,10 +120,14 @@ Tuple::Tuple(const std::list<typeptr_t>& basetypes_) :
         basetypes(basetypes_),
         size(std::accumulate(basetypes.cbegin(), basetypes.cend(), 0, [](std::size_t a, const typeptr_t& b){
                     return a + b->getSize();
-                })) {}
+                })) {
+    if (basetypes.size() > std::numeric_limits<tupleSize_t>::max()) {
+        throw std::runtime_error("Tuple is too large!");
+    }
+}
 
 typeid_t Tuple::getID() const {
-    return 7;
+    return id;
 }
 
 std::size_t Tuple::getSize() const {
@@ -156,4 +162,61 @@ dataptrconst_t Tuple::createPtr(const void* ptr) const {
     // black voodoo!
     return std::make_shared<TuplePtr>(const_cast<void*>(ptr), basetypes, size);
 }
+
+void Tuple::generateDescriptor(typedescr_t::iterator& begin, typedescr_t::iterator end) const {
+    if (begin == end) {
+        throw std::runtime_error("Typedescriptor is going to be too long!");
+    }
+    *begin = id;
+    ++begin;
+
+    tupleSize_t count = basetypes.size();
+    std::bitset<sizeof(typeid_t) * 8> mask1;
+    mask1.flip();
+    auto mask2 = mask1.to_ulong();
+    for (std::size_t i = sizeof(tupleSize_t) / sizeof(typeid_t); i > 0; --i) {
+        if (begin == end) {
+            throw std::runtime_error("Typedescriptor is going to be too long!");
+        }
+
+        *begin = (count >> (sizeof(typeid_t) * (i - 1))) & mask2;
+        ++begin;
+    }
+
+    for (const auto& t : basetypes) {
+        t->generateDescriptor(begin, end);
+    }
+}
+
+typeptr_t Tuple::parseDescriptor(typedescr_t::const_iterator& begin, typedescr_t::const_iterator end) {
+    if (begin == end) {
+        throw std::runtime_error("Illegal type descriptor!");
+    }
+    if (*begin != id) {
+        throw std::runtime_error("This typedescriptor does not belong to this type!");
+    }
+    ++begin;
+
+    arraySize_t count = 0;
+    for (std::size_t i = 0; i < sizeof(tupleSize_t) / sizeof(typeid_t); ++i) {
+        if (begin == end) {
+            throw std::runtime_error("Illegal typedescriptor!");
+        }
+
+        count = (count << sizeof(typeid_t)) | *begin;
+        ++begin;
+    }
+
+    std::list<typeptr_t> basetypes;
+    for (std::size_t i = 0; i < count; ++i) {
+        if (begin == end) {
+            throw std::runtime_error("Illegal typedescriptor!");
+        }
+
+        basetypes.push_back(Typeregistry::getRegistry().parseType(begin, end));
+    }
+
+    return std::make_shared<Tuple>(basetypes);
+}
+
 
