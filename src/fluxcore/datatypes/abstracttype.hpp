@@ -47,7 +47,7 @@ class DataPtr {
         virtual dataptr_t operator+(std::size_t delta) = 0;
         virtual dataptrconst_t operator+(std::size_t delta) const = 0;
 
-        virtual std::size_t operator-(const DataPtr& ptr) const = 0;
+        virtual ptrdiff_t operator-(const DataPtr& ptr) const = 0;
 };
 
 class DataRef {

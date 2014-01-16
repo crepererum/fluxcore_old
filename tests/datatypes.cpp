@@ -1,3 +1,4 @@
+#include <cstring>
 #include <list>
 #include <set>
 #include <utility>
@@ -62,6 +63,23 @@ go_bandit([](){
                     AssertThat(t2->getID(), Equals(t->getID()));
                     AssertThat(t2->getSize(), Equals(t->getSize()));
                     AssertThat(t2->getName(), Equals(t->getName()));
+                });
+
+                it("emmits correct and functional type pointers", [&](){
+                    std::size_t amount = t->getSize() * 10;
+                    void* mem = malloc(amount);
+                    memset(mem, 0, amount);
+
+                    void* cPtr1 = mem;
+                    void* cPtr2 = static_cast<void*>(static_cast<byte_t*>(mem) + (t->getSize() * 3));
+
+                    auto p1 = t->createPtr(cPtr1);
+                    auto p2 = t->createPtr(cPtr2);
+                    auto p3 = *p1 + 2;
+
+                    AssertThat(*p2 - *p1, Equals(static_cast<ptrdiff_t>(3)));
+                    AssertThat(*p3 - *p1, Equals(static_cast<ptrdiff_t>(2)));
+                    AssertThat(*p3 - *p2, Equals(static_cast<ptrdiff_t>(-1)));
                 });
             });
         }

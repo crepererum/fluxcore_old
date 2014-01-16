@@ -32,7 +32,7 @@ class DataPtrTemplate : public DataPtr {
             return std::make_shared<DataPtrTemplate<T>>(ptr + delta);
         }
 
-        virtual std::size_t operator-(const DataPtr& obj) const override {
+        virtual ptrdiff_t operator-(const DataPtr& obj) const override {
             auto o = dynamic_cast<const DataPtrTemplate<T>&>(obj);
             return ptr - o.ptr;
         }

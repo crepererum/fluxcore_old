@@ -22,9 +22,9 @@ class ArrayPtr : public DataPtr {
             return std::make_shared<ArrayPtr>(ptr + delta * size * basetype->getSize(), basetype, size);
         }
 
-        virtual std::size_t operator-(const DataPtr& obj) const override {
+        virtual ptrdiff_t operator-(const DataPtr& obj) const override {
             auto o = dynamic_cast<const ArrayPtr&>(obj);
-            return (ptr - o.ptr) / (size * basetype->getSize());
+            return (ptr - o.ptr) / static_cast<ptrdiff_t>(size * basetype->getSize());
         }
 
     private:

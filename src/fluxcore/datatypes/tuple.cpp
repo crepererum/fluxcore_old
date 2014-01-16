@@ -26,9 +26,9 @@ class TuplePtr : public DataPtr {
             return std::make_shared<TuplePtr>(ptr + delta * size, basetypes, size);
         }
 
-        virtual std::size_t operator-(const DataPtr& obj) const override {
+        virtual ptrdiff_t operator-(const DataPtr& obj) const override {
             auto o = dynamic_cast<const TuplePtr&>(obj);
-            return (ptr - o.ptr) / size;
+            return (ptr - o.ptr) / static_cast<ptrdiff_t>(size);
         }
 
     private:
