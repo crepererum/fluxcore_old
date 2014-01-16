@@ -23,6 +23,9 @@ void fluxcore::init() {
         r.registerDefaultType<Float>();
         r.registerDefaultType<Int>();
         r.registerDefaultType<Tuple>();
+
+        // prevent second init
+        finished = true;
     }
 }
 
