@@ -100,10 +100,13 @@ dataref_t ArrayPtr::operator*() {
     return std::shared_ptr<DataRef>(new ArrayRef(ptr, basetype, size));
 }
 
-Array::Array(typeptr_t& basetype_, arraySize_t size_) :
+Array::Array(const typeptr_t& basetype_, arraySize_t size_) :
         basetype(basetype_),
         size(size_) {}
 
+Array::Array(typeptr_t&& basetype_, arraySize_t size_) :
+        basetype(basetype_),
+        size(size_) {}
 typeid_t Array::getID() const {
     return id;
 }

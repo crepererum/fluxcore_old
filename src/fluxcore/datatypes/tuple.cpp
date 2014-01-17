@@ -115,15 +115,22 @@ dataref_t TuplePtr::operator*() {
     return std::shared_ptr<DataRef>(new TupleRef(ptr, basetypes, size));
 }
 
-// I know this sucks, but I liked this construction :P
-Tuple::Tuple(const std::list<typeptr_t>& basetypes_) :
-        basetypes(basetypes_),
-        size(std::accumulate(basetypes.cbegin(), basetypes.cend(), 0, [](std::size_t a, const typeptr_t& b){
-                    return a + b->getSize();
-                })) {
+Tuple::Tuple(const std::list<typeptr_t>& basetypes_) : basetypes(basetypes_) {
+    init();
+}
+
+Tuple::Tuple(std::list<typeptr_t>&& basetypes_) : basetypes(basetypes_) {
+    init();
+}
+
+void Tuple::init()  {
     if (basetypes.size() > std::numeric_limits<tupleSize_t>::max()) {
         throw std::runtime_error("Tuple is too large!");
     }
+
+    size = std::accumulate(basetypes.cbegin(), basetypes.cend(), 0, [](std::size_t a, const typeptr_t& b){
+        return a + b->getSize();
+    });
 }
 
 typeid_t Tuple::getID() const {

@@ -10,7 +10,8 @@ class Array : public AbstractType {
     public:
         static constexpr typeid_t id = 3;
 
-        Array(typeptr_t& basetype_, arraySize_t size_);
+        Array(const typeptr_t& basetype_, arraySize_t size_);
+        Array(typeptr_t&& basetype_, arraySize_t size_);
         virtual ~Array() override = default;
 
         virtual typeid_t getID() const override;

@@ -14,6 +14,7 @@ class Tuple : public AbstractType {
         static constexpr typeid_t id = 7;
 
         Tuple(const std::list<typeptr_t>& basetypes_);
+        Tuple(std::list<typeptr_t>&& basetypes_);
         virtual ~Tuple() override = default;
 
         virtual typeid_t getID() const override;
@@ -29,6 +30,8 @@ class Tuple : public AbstractType {
     private:
         std::list<typeptr_t> basetypes;
         tupleSize_t size;
+
+        void init();
 };
 
 }
