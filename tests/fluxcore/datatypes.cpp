@@ -39,7 +39,7 @@ void test_datatypes() {
 
                 all.push_back(std::make_pair<typeptr_t, std::string>(std::make_shared<Array>(all.begin()->first, 10), "array<bool,10>"));
 
-                std::list<typeptr_t> tupleList;
+                std::vector<typeptr_t> tupleList;
                 tupleList.push_back(std::make_shared<Float>());
                 tupleList.push_back(std::make_shared<Bool>());
                 tupleList.push_back(std::make_shared<Char>());

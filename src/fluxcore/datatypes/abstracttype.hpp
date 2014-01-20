@@ -48,6 +48,8 @@ class DataPtr {
         virtual dataptrconst_t operator+(std::size_t delta) const = 0;
 
         virtual ptrdiff_t operator-(const DataPtr& ptr) const = 0;
+
+        virtual void* get() const = 0;
 };
 
 class DataRef {

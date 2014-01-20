@@ -37,6 +37,10 @@ class DataPtrTemplate : public DataPtr {
             return ptr - o.ptr;
         }
 
+        virtual void* get() const override {
+            return static_cast<void*>(ptr);
+        }
+
     private:
         T* ptr;
 };

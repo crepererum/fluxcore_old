@@ -27,6 +27,10 @@ class ArrayPtr : public DataPtr {
             return (ptr - o.ptr) / static_cast<ptrdiff_t>(size * basetype->getSize());
         }
 
+        virtual void* get() const override {
+            return static_cast<void*>(ptr);
+        }
+
     private:
         byte_t* ptr;
         typeptr_t basetype;
@@ -48,8 +52,8 @@ class ArrayRef : public DataRef {
             auto o = dynamic_cast<const ArrayRef&>(obj);
 
             for (std::size_t i = 0; i < std::min(size, o.size); ++i) {
-                void* target1 = ptr + i * size * basetype->getSize();
-                void* target2 = o.ptr + i * size * basetype->getSize();
+                void* target1 = ptr + i * basetype->getSize();
+                void* target2 = o.ptr + i * o.basetype->getSize();
 
                 dataptr_t subptr1 = basetype->createPtr(target1);
                 dataptr_t subptr2 = basetype->createPtr(target2);
@@ -73,8 +77,8 @@ class ArrayRef : public DataRef {
             }
 
             for (std::size_t i = 0; i < size; ++i) {
-                void* target1 = ptr + i * size * basetype->getSize();
-                void* target2 = o.ptr + i * size * basetype->getSize();
+                void* target1 = ptr + i * basetype->getSize();
+                void* target2 = o.ptr + i * o.basetype->getSize();
 
                 dataptr_t subptr1 = basetype->createPtr(target1);
                 dataptr_t subptr2 = basetype->createPtr(target2);

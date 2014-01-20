@@ -6,46 +6,56 @@
 #include <sstream>
 
 #include "../config.hpp"
+#include "combinedtype.hpp"
+#include "typeregistry.hpp"
 
 using namespace fluxcore;
 
-class TuplePtr : public DataPtr {
+class TuplePtr : public CombinedPtr {
     public:
-        TuplePtr(void* ptr_, const std::list<typeptr_t>& basetypes_, std::size_t size_) :
+        TuplePtr(void* ptr_, const std::vector<typeptr_t>& basetypes_, const std::vector<std::size_t> sizes_) :
             ptr(static_cast<byte_t*>(ptr_)),
             basetypes(basetypes_),
-            size(size_) {}
+            sizes(sizes_) {}
 
         virtual dataref_t operator*() override;
 
         virtual dataptr_t operator+(std::size_t delta) override {
-            return std::make_shared<TuplePtr>(ptr + delta * size, basetypes, size);
+            return std::make_shared<TuplePtr>(ptr + delta * sizes.back(), basetypes, sizes);
         }
 
         virtual dataptrconst_t operator+(std::size_t delta) const override {
-            return std::make_shared<TuplePtr>(ptr + delta * size, basetypes, size);
+            return std::make_shared<TuplePtr>(ptr + delta * sizes.back(), basetypes, sizes);
         }
 
         virtual ptrdiff_t operator-(const DataPtr& obj) const override {
             auto o = dynamic_cast<const TuplePtr&>(obj);
-            return (ptr - o.ptr) / static_cast<ptrdiff_t>(size);
+            return (ptr - o.ptr) / static_cast<ptrdiff_t>(sizes.back());
+        }
+
+        virtual void* get() const override {
+            return static_cast<void*>(ptr);
+        }
+
+        virtual dataptrconst_t getSubPtr(std::size_t i) const override {
+            return basetypes[i]->createPtr(static_cast<void*>(ptr + sizes[i]));
         }
 
     private:
         byte_t* ptr;
-        std::list<typeptr_t> basetypes;
-        std::size_t size;
+        std::vector<typeptr_t> basetypes;
+        std::vector<std::size_t> sizes;
 };
 
 class TupleRef : public DataRef {
     public:
-        TupleRef(void* ptr_, const std::list<typeptr_t>& basetypes_, std::size_t size_) :
+        TupleRef(void* ptr_, const std::vector<typeptr_t>& basetypes_, std::vector<std::size_t> sizes_) :
             ptr(static_cast<byte_t*>(ptr_)),
             basetypes(basetypes_),
-            size(size_) {}
+            sizes(sizes_) {}
 
         virtual dataptr_t operator&() override {
-            return std::make_shared<TuplePtr>(ptr, basetypes, size);
+            return std::make_shared<TuplePtr>(ptr, basetypes, sizes);
         }
 
         virtual bool operator<(const DataRef& obj) override {
@@ -54,8 +64,8 @@ class TupleRef : public DataRef {
             auto iter2 = o.basetypes.cbegin();
 
             for (std::size_t i = 0; i < std::min(basetypes.size(), o.basetypes.size()); ++i) {
-                void* target1 = ptr + i * size * (*iter1)->getSize();
-                void* target2 = o.ptr + i * size * (*iter2)->getSize();
+                void* target1 = ptr + sizes[i];
+                void* target2 = o.ptr + o.sizes[i];
 
                 dataptr_t subptr1 = (*iter1)->createPtr(target1);
                 dataptr_t subptr2 = (*iter2)->createPtr(target2);
@@ -77,16 +87,16 @@ class TupleRef : public DataRef {
         virtual bool operator==(const DataRef& obj) override {
             auto o = dynamic_cast<const TupleRef&>(obj);
 
-            if (size != o.size) {
+            if (basetypes.size() != o.basetypes.size()) {
                 return false;
             }
 
             auto iter1 = basetypes.cbegin();
             auto iter2 = o.basetypes.cbegin();
 
-            for (std::size_t i = 0; i < size; ++i) {
-                void* target1 = ptr + i * size * (*iter1)->getSize();
-                void* target2 = o.ptr + i * size * (*iter2)->getSize();
+            for (std::size_t i = 0; i < basetypes.size(); ++i) {
+                void* target1 = ptr + sizes[i];
+                void* target2 = o.ptr + o.sizes[i];
 
                 dataptr_t subptr1 = (*iter1)->createPtr(target1);
                 dataptr_t subptr2 = (*iter2)->createPtr(target2);
@@ -107,19 +117,19 @@ class TupleRef : public DataRef {
 
     private:
         byte_t* ptr;
-        std::list<typeptr_t> basetypes;
-        std::size_t size;
+        std::vector<typeptr_t> basetypes;
+        std::vector<std::size_t> sizes;
 };
 
 dataref_t TuplePtr::operator*() {
-    return std::shared_ptr<DataRef>(new TupleRef(ptr, basetypes, size));
+    return std::shared_ptr<DataRef>(new TupleRef(ptr, basetypes, sizes));
 }
 
-Tuple::Tuple(const std::list<typeptr_t>& basetypes_) : basetypes(basetypes_) {
+Tuple::Tuple(const std::vector<typeptr_t>& basetypes_) : basetypes(basetypes_), sizes(basetypes.size() + 1) {
     init();
 }
 
-Tuple::Tuple(std::list<typeptr_t>&& basetypes_) : basetypes(basetypes_) {
+Tuple::Tuple(std::vector<typeptr_t>&& basetypes_) : basetypes(basetypes_), sizes(basetypes.size() + 1) {
     init();
 }
 
@@ -128,9 +138,10 @@ void Tuple::init()  {
         throw std::runtime_error("Tuple is too large!");
     }
 
-    size = std::accumulate(basetypes.cbegin(), basetypes.cend(), 0, [](std::size_t a, const typeptr_t& b){
-        return a + b->getSize();
-    });
+    sizes[0] = 0;
+    for (std::size_t i = 0; i < basetypes.size(); ++i) {
+        sizes[i + 1] = sizes[i] + basetypes[i]->getSize();
+    }
 }
 
 typeid_t Tuple::getID() const {
@@ -138,7 +149,7 @@ typeid_t Tuple::getID() const {
 }
 
 std::size_t Tuple::getSize() const {
-    return size;
+    return sizes.back();
 }
 
 std::string Tuple::getName() const {
@@ -162,12 +173,12 @@ std::string Tuple::getName() const {
 }
 
 dataptr_t Tuple::createPtr(void* ptr) const {
-    return std::make_shared<TuplePtr>(ptr, basetypes, size);
+    return std::make_shared<TuplePtr>(ptr, basetypes, sizes);
 }
 
 dataptrconst_t Tuple::createPtr(const void* ptr) const {
     // black voodoo!
-    return std::make_shared<TuplePtr>(const_cast<void*>(ptr), basetypes, size);
+    return std::make_shared<TuplePtr>(const_cast<void*>(ptr), basetypes, sizes);
 }
 
 void Tuple::generateDescriptor(typedescr_t::iterator& begin, typedescr_t::iterator end) const {
@@ -214,7 +225,7 @@ typeptr_t Tuple::parseDescriptor(typedescr_t::const_iterator& begin, typedescr_t
         ++begin;
     }
 
-    std::list<typeptr_t> basetypes;
+    std::vector<typeptr_t> basetypes;
     for (std::size_t i = 0; i < count; ++i) {
         if (begin == end) {
             throw std::runtime_error("Illegal typedescriptor!");

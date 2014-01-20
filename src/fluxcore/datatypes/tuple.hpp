@@ -1,11 +1,10 @@
 #ifndef FLUXCORE_TUPLE_HPP
 #define FLUXCORE_TUPLE_HPP
 
-#include <list>
+#include <vector>
 
 #include "../config.hpp"
 #include "abstracttype.hpp"
-#include "typeregistry.hpp"
 
 namespace fluxcore {
 
@@ -13,8 +12,8 @@ class Tuple : public AbstractType {
     public:
         static constexpr typeid_t id = 7;
 
-        Tuple(const std::list<typeptr_t>& basetypes_);
-        Tuple(std::list<typeptr_t>&& basetypes_);
+        Tuple(const std::vector<typeptr_t>& basetypes_);
+        Tuple(std::vector<typeptr_t>&& basetypes_);
         virtual ~Tuple() override = default;
 
         virtual typeid_t getID() const override;
@@ -28,8 +27,8 @@ class Tuple : public AbstractType {
         static typeptr_t parseDescriptor(typedescr_t::const_iterator& begin, typedescr_t::const_iterator end);
 
     private:
-        std::list<typeptr_t> basetypes;
-        tupleSize_t size;
+        std::vector<typeptr_t> basetypes;
+        std::vector<std::size_t> sizes;
 
         void init();
 };
