@@ -3,9 +3,11 @@
 #include <bitset>
 #include <sstream>
 
+#include "combinedtype.hpp"
+
 using namespace fluxcore;
 
-class ArrayPtr : public DataPtr {
+class ArrayPtr : public CombinedPtr {
     public:
         ArrayPtr(void* ptr_, typeptr_t basetype_, arraySize_t size_) :
             ptr(static_cast<byte_t*>(ptr_)),
@@ -29,6 +31,10 @@ class ArrayPtr : public DataPtr {
 
         virtual void* get() const override {
             return static_cast<void*>(ptr);
+        }
+
+        virtual dataptrconst_t getSubPtr(std::size_t i) const {
+            return basetype->createPtr(ptr + i * basetype->getSize());
         }
 
     private:
