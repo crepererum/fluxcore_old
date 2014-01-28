@@ -1,5 +1,7 @@
 # setup cmake
 cmake_minimum_required (VERSION 2.8)
+set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/extern/cotire/CMake")
+include (cotire)
 
 # project metadata
 project (fluxcore)
@@ -19,12 +21,14 @@ include_directories ("src" "extern/bandit")
 # build libfluxcore
 file (GLOB_RECURSE SourceFilesLib "src/fluxcore/*.cpp")
 add_library (fluxcore ${SourceFilesLib})
+cotire (fluxcore)
 
 # build test
 file (GLOB_RECURSE SourceFilesTest "tests/*.cpp")
 add_executable (fluxtest EXCLUDE_FROM_ALL ${SourceFilesTest})
 target_link_libraries (fluxtest fluxcore)
 add_custom_target (test COMMAND fluxtest "--reporter=spec" DEPENDS fluxtest)
+cotire (test)
 
 # generate docs
 string (STRIP "${CMAKE_CXX_FLAGS}" DocsCxxFlags)
